@@ -9,13 +9,13 @@ import (
 )
 
 type httpServer struct {
-	Log *log.Store
+	Registry *log.Registry
 }
 
 // newHTTPServer is a factory that creates the listener
-func newHTTPServer(log *log.Store) *httpServer {
+func newHTTPServer(registry *log.Registry) *httpServer {
 	return &httpServer{
-		Log: log,
+		Registry: registry,
 	}
 }
 
@@ -37,6 +37,13 @@ type ConsumeResponse struct {
 }
 
 func (s *httpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
+
+	// 1. Get Topic
+	topic := r.URL.Query().Get("topic")
+	if topic == "" {
+		http.Error(w, "topic query param is required", http.StatusBadRequest)
+		return
+	}
 	// 1. Decode the request
 	var req ProduceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -44,8 +51,14 @@ func (s *httpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	store, err := s.Registry.GetOrCreateStore(topic)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// 2. Call the core logic (The Store)
-	off, err := s.Log.Append(req.Record)
+	off, err := store.Append(req.Record)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -65,6 +78,12 @@ func (s *httpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
 	// 	http.Error(w, err.Error(), http.StatusBadRequest)
 	// 	return
 	// }
+	topic := r.URL.Query().Get("topic")
+	if topic == "" {
+		http.Error(w, "topic query param is required", http.StatusBadRequest)
+		return
+	}
+
 	offsetStr := r.URL.Query().Get("offset")
 	if offsetStr == "" {
 		http.Error(w, "offset is required", http.StatusBadRequest)
@@ -77,7 +96,14 @@ func (s *httpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	record, err := s.Log.Read(offset)
+	// 2. Get the specific store
+	store, err := s.Registry.GetOrCreateStore(topic)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	record, err := store.Read(offset)
 	if err == log.ErrOffsetNotFound {
 		http.Error(w, err.Error(), http.StatusNotFound) // 404 if offset doesn't exist
 		return
@@ -95,8 +121,8 @@ func (s *httpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewHTTPServer creates the server and sets up routes
-func NewHTTPServer(addr string, log *log.Store) *http.Server {
-	httpsrv := newHTTPServer(log)
+func NewHTTPServer(addr string, registry *log.Registry) *http.Server {
+	httpsrv := newHTTPServer(registry)
 
 	mux := http.NewServeMux()
 	// Map endpoints to functions

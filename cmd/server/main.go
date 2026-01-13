@@ -8,16 +8,15 @@ import (
 )
 
 func main() {
-	// 1. Initialize the Storage
-	srv, err := mylog.NewStore("log_store.bin")
+	// 1. Initialize the registry
+	registry, err := mylog.NewRegistry("./prog_log")
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Best practice: Close the file when main exits
-	defer srv.Close()
+	defer registry.CloseAll()
 
 	// 2. Initialize the Network Server
-	httpSrv := server.NewHTTPServer(":8080", srv)
+	httpSrv := server.NewHTTPServer(":8080", registry)
 
 	// 3. Start
 	log.Println("Starting server on :8080")

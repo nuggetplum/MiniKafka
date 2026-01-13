@@ -1,0 +1,45 @@
+# variable definitions
+BINARY_NAME=minikafka
+LOG_DIR=prog_log
+
+# "all" is the default target when you just run "make"
+all: build test
+
+# 1. Build the project
+build:
+	@echo "Building..."
+	go build -o bin/$(BINARY_NAME) cmd/server/main.go
+
+# 2. Run the project (Standard)
+run:
+	go run cmd/server/main.go
+
+# 3. Run the Tests
+test:
+	@echo "Running tests..."
+	go test -v ./...
+
+# 4. Clean up binaries and logs (Linux/Git Bash)
+clean:
+	@echo "Cleaning..."
+	go clean
+	rm -rf bin/
+	rm -rf $(LOG_DIR)/
+
+# 5. Clean up (Windows PowerShell specific)
+# Run this as: make clean-win
+clean-win:
+	@echo "Cleaning (Windows)..."
+	go clean
+	if (Test-Path bin) { Remove-Item -Recurse -Force bin }
+	if (Test-Path $(LOG_DIR)) { Remove-Item -Recurse -Force $(LOG_DIR) }
+
+# 6. Install dependencies
+deps:
+	go mod tidy
+
+
+build-linux:
+	set GOOS=linux
+	set GOARCH=amd64
+	go build -o bin/$(BINARY_NAME)-linux cmd/server/main.go
