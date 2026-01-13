@@ -7,7 +7,8 @@ import (
 )
 
 func TestStoreAppendRead(t *testing.T) {
-	log := NewStore()
+	log, err := NewStore(t.TempDir() + "/store")
+	assert.NoError(t, err)
 
 	append := Record{
 		Value: []byte("hello world"),
